@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
-import { DollarSign, Package, Upload, Store, User, Phone, MessageSquare, LogOut, Download, FileSpreadsheet, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { DollarSign, Package, Upload, Store, User, Phone, MessageSquare, LogOut, Download, FileSpreadsheet, AlertTriangle, CheckCircle2, XCircle, Camera, Search } from "lucide-react";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { debounce } from "lodash";
 import { z } from "zod";
@@ -17,6 +17,7 @@ import { StoreFeedbackViewer } from "@/components/StoreFeedbackViewer";
 import { countries } from "@/data/countries";
 import { cn } from "@/lib/utils";
 import { SmartShopperLayout } from "@/components/SmartShopperSidebar";
+import { BarcodeScanner } from "@/components/BarcodeScanner";
 
 // Validation schema for price updates
 const priceSchema = z.object({
@@ -47,6 +48,8 @@ const StoreOwnerDashboard = () => {
   const [csvErrors, setCsvErrors] = useState<Array<{ line: number; gtin: string; message: string }>>([]);
   const [csvErrorDialogOpen, setCsvErrorDialogOpen] = useState(false);
   const [lastImportStats, setLastImportStats] = useState<{ success: number; failed: number } | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [unverifiedPrices, setUnverifiedPrices] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadStores();
@@ -80,6 +83,7 @@ const StoreOwnerDashboard = () => {
     if (selectedStoreId) {
       loadStorePrices(selectedStoreId);
       loadStoreContact(selectedStoreId);
+      loadStoreProducts(selectedStoreId);
     }
   }, [selectedStoreId]);
 
@@ -98,15 +102,33 @@ const StoreOwnerDashboard = () => {
     }
   };
 
-  const searchProducts = async (term: string) => {
+  const loadStoreProducts = async (storeId: string) => {
+    if (!storeId) return;
     setIsSearching(true);
-    if (!term.trim()) {
+    // Get all GTINs that have prices in this store
+    const { data: storePriceData } = await supabase
+      .from("store_prices")
+      .select("product_gtin")
+      .eq("store_id", storeId);
+
+    if (storePriceData && storePriceData.length > 0) {
+      const gtins = storePriceData.map((sp: any) => sp.product_gtin);
       const { data } = await supabase
         .from("products")
         .select("*")
-        .limit(500);
+        .in("gtin", gtins);
       setProducts(data || []);
-      setIsSearching(false);
+    } else {
+      setProducts([]);
+    }
+    setIsSearching(false);
+  };
+
+  const searchProducts = async (term: string) => {
+    setIsSearching(true);
+    if (!term.trim()) {
+      // When no search term, show the store's current priced products
+      await loadStoreProducts(selectedStoreId);
       return;
     }
 
@@ -139,17 +161,22 @@ const StoreOwnerDashboard = () => {
     const stockMap: Record<string, boolean> = {};
     const verifiedMap: Record<string, boolean> = {};
     const sourceMap: Record<string, string> = {};
+    const unverifiedMap: Record<string, string> = {};
     data?.forEach((p: any) => {
       priceMap[p.product_gtin] = p.price.toString();
       stockMap[p.product_gtin] = p.in_stock ?? true;
       verifiedMap[p.product_gtin] = p.verified ?? false;
       sourceMap[p.product_gtin] = p.source ?? 'store_owner';
+      if (p.unverified_price !== null && p.unverified_price !== undefined) {
+        unverifiedMap[p.product_gtin] = p.unverified_price.toString();
+      }
     });
     setPrices(priceMap);
     setCurrentPrices(priceMap);
     setInStock(stockMap);
     setVerifiedStatus(verifiedMap);
     setSourceStatus(sourceMap);
+    setUnverifiedPrices(unverifiedMap);
   };
 
   const loadStoreContact = async (storeId: string) => {
@@ -500,6 +527,12 @@ const StoreOwnerDashboard = () => {
     }
   };
 
+  const handleBarcodeScan = (code: string) => {
+    setScanning(false);
+    setSearchTerm(code);
+    searchProducts(code);
+  };
+
   const selectedStore = stores.find(s => s.id === selectedStoreId);
 
   const handleLogout = async () => {
@@ -598,6 +631,10 @@ const StoreOwnerDashboard = () => {
         csvErrorDialogOpen={csvErrorDialogOpen}
         setCsvErrorDialogOpen={setCsvErrorDialogOpen}
         lastImportStats={lastImportStats}
+        scanning={scanning}
+        setScanning={setScanning}
+        handleBarcodeScan={handleBarcodeScan}
+        unverifiedPrices={unverifiedPrices}
       />
     </SmartShopperLayout>
   );
@@ -641,6 +678,10 @@ const StoreOwnerContent = ({
   csvErrorDialogOpen,
   setCsvErrorDialogOpen,
   lastImportStats,
+  scanning,
+  setScanning,
+  handleBarcodeScan,
+  unverifiedPrices,
 }: any) => {
   return (
     <div className="flex flex-1 flex-col w-full">
@@ -847,11 +888,31 @@ const StoreOwnerContent = ({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Input
-                placeholder="Search products by GTIN or description..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+              <BarcodeScanner
+                onDetected={handleBarcodeScan}
+                scanning={scanning}
+                onStartScan={() => setScanning(true)}
+                onStopScan={() => setScanning(false)}
               />
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">or search manually</span>
+                </div>
+              </div>
+
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search products by GTIN or description..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
 
               {isSearching && (
                 <p className="text-sm text-muted-foreground text-center py-4">
@@ -867,7 +928,7 @@ const StoreOwnerContent = ({
 
               {!isSearching && products.length === 0 && !searchTerm && (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  Start typing to search for products...
+                  No products with prices in this store yet. Search or scan to add products.
                 </p>
               )}
 
@@ -909,26 +970,42 @@ const StoreOwnerContent = ({
                           <span className="text-sm whitespace-nowrap">Out of Stock</span>
                         </label>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {currentPrices[product.gtin] && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-muted-foreground whitespace-nowrap">
-                              Current: {currencySymbol}{currentPrices[product.gtin]}
-                            </span>
-                            <VerifiedBadge verified={verifiedStatus[product.gtin] ?? false} />
-                          </div>
-                        )}
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder={`New Price (${currencySymbol})`}
-                          value={prices[product.gtin] || ""}
-                          onChange={(e) => setPrices({ ...prices, [product.gtin]: e.target.value })}
-                          className="w-40"
-                        />
-                        <Button onClick={() => updatePrice(product.gtin)} size="sm">
-                          Update
-                        </Button>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <div className="flex flex-wrap items-center gap-3">
+                          {currentPrices[product.gtin] && parseFloat(currentPrices[product.gtin]) > 0 && (
+                            <div className="flex items-center gap-1.5 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-md px-2.5 py-1">
+                              <VerifiedBadge verified size="sm" />
+                              <span className="text-sm font-semibold text-green-700 dark:text-green-400 whitespace-nowrap">
+                                {currencySymbol}{parseFloat(currentPrices[product.gtin]).toFixed(2)}
+                              </span>
+                            </div>
+                          )}
+                          {unverifiedPrices[product.gtin] && (
+                            <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md px-2.5 py-1">
+                              <VerifiedBadge verified={false} size="sm" />
+                              <span className="text-sm font-semibold text-amber-700 dark:text-amber-400 whitespace-nowrap">
+                                {currencySymbol}{parseFloat(unverifiedPrices[product.gtin]).toFixed(2)}
+                              </span>
+                              <span className="text-[10px] text-amber-600 dark:text-amber-500">(community)</span>
+                            </div>
+                          )}
+                          {!currentPrices[product.gtin] && !unverifiedPrices[product.gtin] && (
+                            <span className="text-xs text-muted-foreground italic">No price set</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder={`New Price (${currencySymbol})`}
+                            value={prices[product.gtin] || ""}
+                            onChange={(e) => setPrices({ ...prices, [product.gtin]: e.target.value })}
+                            className="w-40"
+                          />
+                          <Button onClick={() => updatePrice(product.gtin)} size="sm">
+                            Update
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -953,62 +1030,17 @@ const StoreOwnerContent = ({
           </Card>
         )}
 
-        {/* Store Contact */}
+        {/* Store Contact - redirects to Store Profile which has all contact fields */}
         {activeSection === 3 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Phone className="h-5 w-5" />
-                Store Contact Information
+                Store Contact & Location
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Update your store's contact information so shoppers can share their lists with you.
-              </p>
-              
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Store Email</label>
-                  <Input
-                    type="email"
-                    placeholder="store@example.com"
-                    value={storeContact.email}
-                    onChange={(e) => setStoreContact({ ...storeContact, email: e.target.value })}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Store Phone</label>
-                  <Input
-                    type="tel"
-                    placeholder="+1234567890"
-                    value={storeContact.contact}
-                    onChange={(e) => setStoreContact({ ...storeContact, contact: e.target.value })}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">WhatsApp Number</label>
-                  <Input
-                    type="tel"
-                    placeholder="+1234567890"
-                    value={storeContact.whatsapp}
-                    onChange={(e) => setStoreContact({ ...storeContact, whatsapp: e.target.value })}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Include country code (e.g., +1 for US, +44 for UK)
-                  </p>
-                </div>
-
-                <Button 
-                  onClick={updateStoreContact} 
-                  disabled={isSavingContact}
-                  className="w-full"
-                >
-                  {isSavingContact ? "Saving..." : "Save Contact Information"}
-                </Button>
-              </div>
+            <CardContent>
+              <StoreProfileEditor />
             </CardContent>
           </Card>
         )}

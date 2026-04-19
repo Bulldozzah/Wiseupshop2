@@ -135,7 +135,7 @@ export default {
 		},
   		fontFamily: {
   			sans: [
-  				'Inter',
+  				'DM Sans',
   				'ui-sans-serif',
   				'system-ui',
   				'sans-serif',
@@ -145,7 +145,7 @@ export default {
   				'Noto Color Emoji'
   			],
   			serif: [
-  				'Lora',
+  				'DM Serif Display',
   				'ui-serif',
   				'Georgia',
   				'Cambria',

@@ -50,6 +50,7 @@ export const StoreProfileEditor = ({ onComplete }: StoreProfileEditorProps) => {
   const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
   const [locationError, setLocationError] = useState<string>("");
+  const [storeName, setStoreName] = useState<string>("");
   const [storeContact, setStoreContact] = useState({
     email: "",
     contact: "",
@@ -239,13 +240,14 @@ export const StoreProfileEditor = ({ onComplete }: StoreProfileEditorProps) => {
 
     const { data: store, error } = await supabase
       .from("stores")
-      .select("*")
+      .select("*, store_hq(name)")
       .eq("store_owner_id", user.id)
       .maybeSingle();
 
     if (store) {
       setHasStore(true);
       setStoreId(store.id);
+      setStoreName(store.store_hq?.name || "Unknown Store");
       setStoreContact({
         email: store.email || "",
         contact: store.contact || "",
@@ -363,6 +365,19 @@ export const StoreProfileEditor = ({ onComplete }: StoreProfileEditorProps) => {
 
   return (
     <div className="space-y-4">
+      {/* Store Name - Read Only */}
+      <div className="space-y-2">
+        <Label>Store Name</Label>
+        <div className="flex items-center gap-2">
+          <Input
+            value={storeName}
+            disabled
+            className="bg-muted font-semibold"
+          />
+          <span className="text-xs text-muted-foreground whitespace-nowrap">Assigned by admin</span>
+        </div>
+      </div>
+
       <div className="space-y-2">
         <Label htmlFor="country">Country</Label>
         <Select value={storeContact.country} onValueChange={handleCountryChange}>

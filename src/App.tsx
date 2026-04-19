@@ -26,6 +26,7 @@ import BrowseStore from "./pages/BrowseStore";
 import Features from "./pages/Features";
 import LoginDemo from "./pages/LoginDemo";
 import NotFound from "./pages/NotFound";
+import ShopperSearchDemo from "./pages/ShopperSearchDemo";
 
 const AppContent = () => {
   const navigate = useNavigate();
@@ -178,6 +179,7 @@ const AppContent = () => {
             <Route path="/falling-pattern-demo" element={<FallingPatternDemo />} />
             <Route path="/fluid-dropdown-demo" element={<FluidDropdownDemo />} />
             <Route path="/login-demo" element={<LoginDemo />} />
+            <Route path="/search-demo" element={<ShopperSearchDemo />} />
             <Route path="/auth" element={!user ? <Auth /> : <Navigate to="/" replace />} />
             <Route
               path="/admin"

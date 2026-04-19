@@ -68,16 +68,13 @@ const Auth = () => {
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-100 relative">
         <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-emerald-100 via-emerald-50 to-transparent opacity-40 blur-3xl -mt-20"></div>
         <div className="p-8">
-          <Link
-            to="/"
-            className="group inline-flex items-center gap-1.5 text-sm text-gray-500 rounded-lg px-3 py-1.5 transition-all duration-200 mb-4 hover:text-emerald-600 hover:bg-emerald-50"
-            style={{ transition: 'all 0.2s' }}
-            onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 0 14px rgba(34,197,94,0.45)'}
-            onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
+          <button
+            onClick={() => navigate('/')}
+            className="group inline-flex items-center gap-1.5 text-sm text-gray-500 rounded-lg px-3 py-1.5 transition-all duration-200 mb-4 hover:text-emerald-600 hover:bg-emerald-50 hover:shadow-[0_0_14px_rgba(34,197,94,0.35)]"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
             Back
-          </Link>
+          </button>
           <div className="flex flex-col items-center mb-8">
             <div className="bg-white p-4 rounded-2xl shadow-lg mb-6">
               <svg
@@ -95,7 +92,7 @@ const Auth = () => {
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-900 text-center">
-                {isSignUp ? "Join WiseShopper" : "Welcome to WiseShopper"}
+                {isSignUp ? "Join Savy" : "Welcome to Savy"}
               </h2>
               <p className="text-center text-gray-500 mt-2">
                 {isSignUp
